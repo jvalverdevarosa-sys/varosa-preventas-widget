@@ -314,6 +314,47 @@
     margin-left: auto;
   }
 
+  .action-bar select.sel-estado-masivo {
+    padding: 6px 10px;
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    font-family: var(--font-body);
+    font-size: 12px;
+    background: white;
+    color: var(--text-primary);
+  }
+  select.plantilla-select {
+    padding: 4px 6px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    max-width: 215px;
+  }
+  select.plantilla-select:hover { border-color: var(--border-light); background: #fffef5; }
+  select.plantilla-select:focus { outline: none; border-color: var(--varosa-cyan); background: white; }
+  .notas-input {
+    width: 190px;
+    padding: 4px 6px;
+    border: 1px solid var(--varosa-cyan);
+    border-radius: 4px;
+    font-family: var(--font-body);
+    font-size: 12px;
+  }
+  .notas-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-left: 4px;
+    padding: 0 2px;
+  }
+  .notas-btn:hover { color: var(--varosa-blue); }
+
   /* ===== TABLA ===== */
   .table-container {
     overflow-x: auto;
@@ -570,6 +611,10 @@
       <button type="button" data-accion="whatsapp">&#128242; Enviar preventa WhatsApp</button>
       <button type="button" class="btn-sec" data-accion="ec">&#128196; Enviar estado de cuenta</button>
       <button type="button" class="btn-sec" data-accion="contactado">&#10003; Marcar contactado</button>
+      <select id="selEstadoMasivo" class="sel-estado-masivo">
+        <option value="">Cambiar estado a...</option>
+      </select>
+      <button type="button" class="btn-sec" data-accion="estadoMasivo">Aplicar</button>
       <button type="button" class="btn-limpiar" id="btnLimpiarSel">Limpiar selecci&#243;n</button>
     </div>
 
@@ -608,11 +653,23 @@
 const N8N_BASE = 'https://n8n-n8n.1efluw.easypanel.host';
 const ENDPOINTS = {
   datos: N8N_BASE + '/webhook/preventas-data',
+  actualizar: N8N_BASE + '/webhook/preventas-update',
   // Fase B2 (aún no existen — el widget los deshabilita solo):
   whatsappMasivo: null,
-  enviarEC: null,
-  actualizarEstado: null
+  enviarEC: null
 };
+
+// Catálogo de plantillas de WhatsApp (nombres exactos en Woztell)
+const PLANTILLAS = [
+  'preventa_utilidad_v1',
+  'preventa_servicio_v1',
+  'preventa_breve_v1',
+  'preventa_amigable_v1',
+  'preventa_formal_botones_v1',
+  'recordatorio_formal_v1'
+];
+// Estados asignables manualmente (validados también en el servidor)
+const ESTADOS_LISTA = ['NO_CONTACTADO', 'CONTACTADO', 'PIDIO', 'COTIZADO', 'NO_NECESITA', 'CONFIRMADO', 'BLOQUEADO POR CXC'];
 
 // ===== USUARIO (desde URL parameter, lo inyecta la página de Creator) =====
 const URL_PARAMS = new URLSearchParams(window.location.search);
@@ -656,11 +713,11 @@ const COLUMNAS = [
   { key: 'vencido',     label: 'Monto vencido',     visible: true },
   { key: 'dias',        label: 'D\u00edas sin compra', visible: false },
   { key: 'ultimo',      label: '\u00daltimo pedido',   visible: false },
-  { key: 'plantilla',   label: 'Plantilla WA',      visible: false },
+  { key: 'plantilla',   label: 'Plantilla WA',      visible: true },
   { key: 'notas',       label: 'Notas',             visible: false },
   { key: 'proxRuta',    label: 'Pr\u00f3xima ruta', visible: false }
 ];
-const LS_COLS_KEY = 'varosa_preventas_cols_v1';
+const LS_COLS_KEY = 'varosa_preventas_cols_v2';
 
 // ===== ESTADO GLOBAL =====
 let registros = [];          // todos los registros del usuario
@@ -956,8 +1013,15 @@ function celda(c, r) {
       return '<td class="cell-right">' + (r.ultimoMonto > 0 ? fmtMoney(r.ultimoMonto) : '') +
              '<span class="doc-ref">' + esc(r.ultimoFecha) + (r.ultimoTipo ? ' \u00b7 ' + esc(r.ultimoTipo) : '') + '</span></td>';
     }
-    case 'plantilla': return '<td style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);">' + esc(r.plantilla || '\u2014') + '</td>';
-    case 'notas': return '<td class="cell-notas" title="' + esc(r.notas) + '">' + esc(r.notas || '\u2014') + '</td>';
+    case 'plantilla': {
+      const lista = (!r.plantilla || PLANTILLAS.includes(r.plantilla)) ? PLANTILLAS : [r.plantilla].concat(PLANTILLAS);
+      let opts = '';
+      lista.forEach(p => {
+        opts += '<option value="' + esc(p) + '"' + (p === r.plantilla ? ' selected' : '') + '>' + esc(p) + '</option>';
+      });
+      return '<td><select class="plantilla-select" data-id="' + esc(r.id) + '" title="Plantilla de WhatsApp para este cliente (se guarda al cambiarla)">' + opts + '</select></td>';
+    }
+    case 'notas': return '<td class="cell-notas" data-notas-id="' + esc(r.id) + '"><span title="' + esc(r.notas) + '">' + esc(r.notas || '\u2014') + '</span><button class="notas-btn" data-edit-notas="' + esc(r.id) + '" title="Editar nota">&#9998;</button></td>';
     case 'proxRuta': return '<td style="font-family:var(--font-mono);font-size:11px;">' + esc(r.proxRuta || '\u2014') + '</td>';
     default: return '<td>\u2014</td>';
   }
@@ -997,6 +1061,16 @@ function renderFilas() {
         const chkTodos = document.getElementById('chkTodos');
         if (chkTodos) chkTodos.checked = filtrados.length > 0 && filtrados.every(r => seleccion.has(r.id));
       });
+    });
+
+    tbody.querySelectorAll('select.plantilla-select').forEach(sel => {
+      sel.addEventListener('change', function () {
+        actualizarRegistros([this.dataset.id], { Plantilla_WhatsApp: this.value }, 'Plantilla actualizada');
+      });
+    });
+
+    tbody.querySelectorAll('button[data-edit-notas]').forEach(btn => {
+      btn.addEventListener('click', function () { editarNotas(this.dataset.editNotas); });
     });
   }
 
@@ -1045,10 +1119,91 @@ function renderActionBar() {
 // ACCIONES (Fase B2 — por ahora informan que están en camino)
 // ============================================================
 function ejecutarAccion(accion) {
-  const n = seleccion.size;
-  if (n === 0) return;
-  const nombres = { whatsapp: 'Env\u00edo de preventa por WhatsApp', ec: 'Env\u00edo de estado de cuenta', contactado: 'Marcar como contactado' };
-  mostrarStatus('\u2692\ufe0f ' + (nombres[accion] || accion) + ' (' + n + ' clientes): esta acci\u00f3n se conecta en la Fase B2. Por ahora segu\u00ed us\u00e1ndola desde el reporte de Creator.', 'loading');
+  const ids = [...seleccion];
+  if (ids.length === 0) return;
+
+  if (accion === 'contactado') {
+    actualizarRegistros(ids, { Estado: 'CONTACTADO' }, ids.length + ' cliente(s) marcado(s) como contactado');
+    return;
+  }
+  if (accion === 'estadoMasivo') {
+    const nuevo = document.getElementById('selEstadoMasivo').value;
+    if (!nuevo) {
+      mostrarStatus('Primero eleg\u00ed el estado en el desplegable "Cambiar estado a..."', 'error');
+      return;
+    }
+    const cfg = ESTADOS_CFG[nuevo] || { label: nuevo };
+    actualizarRegistros(ids, { Estado: nuevo }, ids.length + ' cliente(s) cambiado(s) a ' + cfg.label);
+    return;
+  }
+  const nombres = { whatsapp: 'Env\u00edo de preventa por WhatsApp', ec: 'Env\u00edo de estado de cuenta' };
+  mostrarStatus('\u2692\ufe0f ' + (nombres[accion] || accion) + ' (' + ids.length + ' clientes): esta acci\u00f3n se conecta en la Fase B2. Por ahora segu\u00ed us\u00e1ndola desde el reporte de Creator.', 'loading');
+}
+
+// ============================================================
+// ACTUALIZACIÓN REAL: escribe en la base de datos vía N8N y
+// solo refleja el cambio en pantalla cuando el servidor confirma
+// ============================================================
+async function actualizarRegistros(ids, campos, mensajeExito) {
+  if (MODO_DEMO) {
+    mostrarStatus('Modo demo: sin conexi\u00f3n con N8N, los cambios no se guardan', 'error');
+    renderFilas();
+    return;
+  }
+  mostrarStatus('Guardando cambios...', 'loading');
+  try {
+    const resp = await fetch(ENDPOINTS.actualizar, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ usuario: USUARIO_ACTUAL, ids: ids, campos: campos })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.actualizados === 0) {
+      throw new Error(data.error || ('fallaron ' + data.fallidos + ' registro(s)'));
+    }
+    // La base de datos ya quedó actualizada: reflejar en los datos locales
+    registros.forEach(r => {
+      if (ids.includes(r.id)) {
+        if (campos.Estado !== undefined) r.estado = campos.Estado;
+        if (campos.Plantilla_WhatsApp !== undefined) r.plantilla = campos.Plantilla_WhatsApp;
+        if (campos.Notas !== undefined) r.notas = campos.Notas;
+      }
+    });
+    construirFiltrosDinamicos();
+    renderTodo();
+    const extra = data.fallidos > 0 ? ' \u2014 atenci\u00f3n: ' + data.fallidos + ' fallaron' : '';
+    mostrarStatus('\u2713 ' + (mensajeExito || 'Cambios guardados') + extra, data.fallidos > 0 ? 'error' : 'success');
+  } catch (e) {
+    mostrarStatus('Error al guardar: ' + e.message + ' \u2014 los datos NO se modificaron, prob\u00e1 de nuevo', 'error');
+    renderFilas();
+  }
+}
+
+// Edición inline de la nota de un registro (Enter o clic afuera = guardar, Esc = cancelar)
+function editarNotas(id) {
+  const td = document.querySelector('td[data-notas-id="' + id + '"]');
+  const reg = registros.find(r => r.id === id);
+  if (!td || !reg) return;
+  const valorOriginal = reg.notas || '';
+  td.innerHTML = '<input type="text" class="notas-input" maxlength="200">';
+  const input = td.querySelector('input');
+  input.value = valorOriginal;
+  input.focus();
+  input.select();
+  let cerrado = false;
+  function guardar() {
+    if (cerrado) return;
+    cerrado = true;
+    const nuevo = input.value.trim();
+    if (nuevo === valorOriginal) { renderFilas(); return; }
+    actualizarRegistros([id], { Notas: nuevo }, 'Nota guardada');
+  }
+  input.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') guardar();
+    if (ev.key === 'Escape') { cerrado = true; renderFilas(); }
+  });
+  input.addEventListener('blur', guardar);
 }
 
 // ============================================================
@@ -1118,6 +1273,15 @@ document.addEventListener('DOMContentLoaded', () => {
       panel.classList.remove('open');
     }
   });
+  const selMasivo = document.getElementById('selEstadoMasivo');
+  ESTADOS_LISTA.forEach(e => {
+    const cfg = ESTADOS_CFG[e] || { label: e };
+    const opt = document.createElement('option');
+    opt.value = e;
+    opt.textContent = cfg.label;
+    selMasivo.appendChild(opt);
+  });
+
   document.querySelectorAll('.action-bar button[data-accion]').forEach(btn => {
     btn.addEventListener('click', function () { ejecutarAccion(this.dataset.accion); });
   });
