@@ -355,6 +355,108 @@
   }
   .notas-btn:hover { color: var(--varosa-blue); }
 
+  .prev-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-left: 2px;
+    padding: 0 2px;
+    vertical-align: middle;
+  }
+  .prev-btn:hover { color: var(--varosa-blue); }
+
+  /* ===== MODAL VISTA PREVIA WHATSAPP ===== */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(30, 50, 80, 0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal-box {
+    background: white;
+    border-radius: 12px;
+    max-width: 460px;
+    width: 92%;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+    overflow: hidden;
+  }
+  .modal-head {
+    background: var(--varosa-dark);
+    color: white;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-display);
+    font-size: 14px;
+  }
+  .modal-head button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .modal-meta {
+    padding: 10px 16px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 11px;
+  }
+  .cat-badge {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 0.3px;
+  }
+  .cat-utility { background: #d9f2e3; color: #1d7a45; }
+  .cat-marketing { background: #fdeccc; color: #9a6a00; }
+  .wa-zone {
+    background: #e5ddd5;
+    padding: 20px 18px;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+  .wa-bubble {
+    background: #ffffff;
+    border-radius: 0 8px 8px 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.12);
+    max-width: 95%;
+  }
+  .wa-btn {
+    background: #ffffff;
+    border-radius: 8px;
+    margin-top: 6px;
+    padding: 8px 12px;
+    text-align: center;
+    font-size: 13px;
+    color: #1c9edb;
+    font-weight: 600;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.12);
+    max-width: 95%;
+  }
+  .modal-foot {
+    padding: 10px 16px;
+    font-size: 11px;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border-light);
+  }
+
   /* ===== TABLA ===== */
   .table-container {
     overflow-x: auto;
@@ -641,6 +743,19 @@
   </div>
 </div>
 
+<!-- Modal de vista previa de plantilla WhatsApp -->
+<div class="modal-overlay" id="modalPreview">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span id="prevTitulo">Vista previa</span>
+      <button type="button" id="btnCerrarPreview" title="Cerrar">&#10005;</button>
+    </div>
+    <div class="modal-meta" id="prevMeta"></div>
+    <div class="wa-zone" id="prevZona"></div>
+    <div class="modal-foot">Vista previa aproximada: los valores exactos los coloca el sistema al momento del env&#237;o. Si la plantilla se edita en Meta, hay que actualizar la copia del widget.</div>
+  </div>
+</div>
+
 <script>
 // ============================================================
 // VAROSA — Centro de Operaciones Preventas (Widget V1.0)
@@ -659,15 +774,37 @@ const ENDPOINTS = {
   enviarEC: null
 };
 
-// Catálogo de plantillas de WhatsApp (nombres exactos en Woztell)
-const PLANTILLAS = [
-  'preventa_utilidad_v1',
-  'preventa_servicio_v1',
-  'preventa_breve_v1',
-  'preventa_amigable_v1',
-  'preventa_formal_botones_v1',
-  'recordatorio_formal_v1'
-];
+// Catálogo de plantillas de WhatsApp (textos aprobados en Meta, copiados de Woztell)
+// IMPORTANTE: si una plantilla se edita en Meta/Woztell, actualizar aquí el texto
+// Variables: {{1}} = nombre contacto, {{2}} = fecha de ruta, {{3}} = nombre asesora
+const PLANTILLAS_INFO = {
+  'preventa_utilidad_v1': {
+    categoria: 'Utility',
+    cuerpo: 'Estimado/a {{1}}, le informamos que su pr\u00f3xima visita de servicio est\u00e1 programada para el {{2}}.\n\nPara coordinar su pedido o consultas, comun\u00edquese con {{3}}.\n\nVarosa - Equipo Comercial',
+    botones: []
+  },
+  'preventa_servicio_v1': {
+    categoria: 'Marketing',
+    cuerpo: 'Hola {{1}},\n\nSoy {{3}} de Varosa. \ud83d\ude0a\n\nQuer\u00eda avisarte que el {{2}} estar\u00e9 pasando por tu zona.\n\n\u00bfHay algo que necesites? Con gusto te lo llevo.\n\n\u00a1Quedo atenta!',
+    botones: ['S\u00ed, necesito pedido', 'No esta vez']
+  },
+  'preventa_breve_v1': {
+    categoria: 'Marketing',
+    cuerpo: 'Hola {{1}},\n\nRuta programada: {{2}} \ud83d\ude9a\n\n\u00bfNecesitas que te llevemos productos?\n\n{{3}} - Varosa',
+    botones: ['S\u00ed, necesito', 'No, gracias']
+  },
+  'preventa_amigable_v1': {
+    categoria: 'Marketing',
+    cuerpo: '\u00a1Hola {{1}}! \ud83d\udc4b\n\nPasamos a saludarte y comentarte que estaremos por tu zona el {{2}}.\n\n\u00bfTe gustar\u00eda que te llevemos alg\u00fan pedido?\n\n{{3}}\nEquipo Varosa',
+    botones: ['S\u00ed, por favor!', 'No por ahora']
+  },
+  'recordatorio_formal_v1': {
+    categoria: 'Marketing',
+    cuerpo: null, // texto pendiente de capturar desde Woztell
+    botones: []
+  }
+};
+const PLANTILLAS = Object.keys(PLANTILLAS_INFO);
 // Estados asignables manualmente (validados también en el servidor)
 const ESTADOS_LISTA = ['NO_CONTACTADO', 'CONTACTADO', 'PIDIO', 'COTIZADO', 'NO_NECESITA', 'CONFIRMADO', 'BLOQUEADO POR CXC'];
 
@@ -1019,7 +1156,7 @@ function celda(c, r) {
       lista.forEach(p => {
         opts += '<option value="' + esc(p) + '"' + (p === r.plantilla ? ' selected' : '') + '>' + esc(p) + '</option>';
       });
-      return '<td><select class="plantilla-select" data-id="' + esc(r.id) + '" title="Plantilla de WhatsApp para este cliente (se guarda al cambiarla)">' + opts + '</select></td>';
+      return '<td style="white-space:nowrap;"><select class="plantilla-select" data-id="' + esc(r.id) + '" title="Plantilla de WhatsApp para este cliente (se guarda al cambiarla)">' + opts + '</select><button class="prev-btn" data-preview="' + esc(r.id) + '" title="Ver c\u00f3mo le llegar\u00e1 el mensaje al cliente">&#128065;</button></td>';
     }
     case 'notas': return '<td class="cell-notas" data-notas-id="' + esc(r.id) + '"><span title="' + esc(r.notas) + '">' + esc(r.notas || '\u2014') + '</span><button class="notas-btn" data-edit-notas="' + esc(r.id) + '" title="Editar nota">&#9998;</button></td>';
     case 'proxRuta': return '<td style="font-family:var(--font-mono);font-size:11px;">' + esc(r.proxRuta || '\u2014') + '</td>';
@@ -1071,6 +1208,10 @@ function renderFilas() {
 
     tbody.querySelectorAll('button[data-edit-notas]').forEach(btn => {
       btn.addEventListener('click', function () { editarNotas(this.dataset.editNotas); });
+    });
+
+    tbody.querySelectorAll('button[data-preview]').forEach(btn => {
+      btn.addEventListener('click', function () { verPreview(this.dataset.preview); });
     });
   }
 
@@ -1180,7 +1321,74 @@ async function actualizarRegistros(ids, campos, mensajeExito) {
   }
 }
 
-// Edición inline de la nota de un registro (Enter o clic afuera = guardar, Esc = cancelar)
+// ============================================================
+// VISTA PREVIA DE PLANTILLAS WHATSAPP
+// Sustituye {{1}} contacto, {{2}} fecha de ruta, {{3}} asesora
+// con los datos reales del registro
+// ============================================================
+const MESES_ES = { Jan: 'enero', Feb: 'febrero', Mar: 'marzo', Apr: 'abril', May: 'mayo', Jun: 'junio', Jul: 'julio', Aug: 'agosto', Sep: 'septiembre', Oct: 'octubre', Nov: 'noviembre', Dec: 'diciembre' };
+const DIAS_ES = ['domingo', 'lunes', 'martes', 'mi\u00e9rcoles', 'jueves', 'viernes', 's\u00e1bado'];
+const MES_NUM = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+
+// Convierte "12-Jun-2026" en "viernes 12 de junio"
+function formatearFechaLarga(fechaStr) {
+  if (!fechaStr) return '(fecha de ruta)';
+  const partes = String(fechaStr).split('-');
+  if (partes.length !== 3 || !(partes[1] in MES_NUM)) return fechaStr;
+  const d = new Date(parseInt(partes[2], 10), MES_NUM[partes[1]], parseInt(partes[0], 10));
+  if (isNaN(d.getTime())) return fechaStr;
+  return DIAS_ES[d.getDay()] + ' ' + d.getDate() + ' de ' + MESES_ES[partes[1]];
+}
+
+function verPreview(id) {
+  const r = registros.find(x => x.id === id);
+  if (!r) return;
+  const sel = document.querySelector('select.plantilla-select[data-id="' + id + '"]');
+  const plantilla = (sel && sel.value) || r.plantilla || 'preventa_utilidad_v1';
+  const info = PLANTILLAS_INFO[plantilla];
+
+  const tituloEl = document.getElementById('prevTitulo');
+  const metaEl = document.getElementById('prevMeta');
+  const zonaEl = document.getElementById('prevZona');
+  tituloEl.textContent = plantilla;
+
+  if (!info || !info.cuerpo) {
+    metaEl.innerHTML = '';
+    zonaEl.innerHTML = '<div class="wa-bubble">El texto de esta plantilla a\u00fan no est\u00e1 cargado en el widget. Se puede consultar en Woztell &gt; Canal &gt; Message Template.</div>';
+    document.getElementById('modalPreview').classList.add('visible');
+    return;
+  }
+
+  // Datos reales del registro
+  const contacto = (r.contacto || '').split(';;')[0].split('|')[0].trim() || '(contacto)';
+  const fecha = formatearFechaLarga(r.proxRuta);
+  const asesora = (r.backoffice || '').split(' ').slice(0, 2).join(' ') || '(asesora)';
+
+  const cuerpo = info.cuerpo
+    .split('{{1}}').join(contacto)
+    .split('{{2}}').join(fecha)
+    .split('{{3}}').join(asesora);
+
+  const esUtility = info.categoria === 'Utility';
+  metaEl.innerHTML =
+    '<span class="cat-badge ' + (esUtility ? 'cat-utility' : 'cat-marketing') + '">' + esc(info.categoria) + '</span>' +
+    '<span>' + (esUtility
+      ? 'Se ve en WhatsApp Web y celular \u2713'
+      : '\u26a0\ufe0f Solo se ve en el celular del cliente, NO en WhatsApp Web/Desktop') + '</span>' +
+    '<span style="color:var(--text-muted);">Para: ' + esc(r.cliente) + '</span>';
+
+  let html = '<div class="wa-bubble">' + esc(cuerpo) + '</div>';
+  (info.botones || []).forEach(b => { html += '<div class="wa-btn">' + esc(b) + '</div>'; });
+  zonaEl.innerHTML = html;
+
+  document.getElementById('modalPreview').classList.add('visible');
+}
+
+function cerrarPreview() {
+  document.getElementById('modalPreview').classList.remove('visible');
+}
+
+
 function editarNotas(id) {
   const td = document.querySelector('td[data-notas-id="' + id + '"]');
   const reg = registros.find(r => r.id === id);
@@ -1280,6 +1488,14 @@ document.addEventListener('DOMContentLoaded', () => {
     opt.value = e;
     opt.textContent = cfg.label;
     selMasivo.appendChild(opt);
+  });
+
+  document.getElementById('btnCerrarPreview').addEventListener('click', cerrarPreview);
+  document.getElementById('modalPreview').addEventListener('click', function (ev) {
+    if (ev.target === this) cerrarPreview();
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') cerrarPreview();
   });
 
   document.querySelectorAll('.action-bar button[data-accion]').forEach(btn => {
