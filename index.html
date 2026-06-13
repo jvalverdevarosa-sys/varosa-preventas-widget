@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   /* ============================================================
-     VAROSA — Centro de Operaciones Preventas (Widget V1.0)
+     VAROSA — Centro de Operaciones Preventas (Widget V1.3)
      Mismo sistema de diseño que varosa-oc-widget
      ============================================================ */
   :root {
@@ -299,6 +299,7 @@
     transition: all var(--transition);
   }
   .action-bar button:hover { opacity: 0.9; }
+  .action-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
   .action-bar button.btn-sec {
     background: white;
     color: var(--varosa-dark);
@@ -367,7 +368,7 @@
   }
   .prev-btn:hover { color: var(--varosa-blue); }
 
-  /* ===== MODAL VISTA PREVIA WHATSAPP ===== */
+  /* ===== MODAL (vista previa + confirmación + resultados) ===== */
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -455,6 +456,113 @@
     font-size: 11px;
     color: var(--text-muted);
     border-top: 1px solid var(--border-light);
+  }
+
+  /* ===== MODAL: cuerpo de confirmación y resultados ===== */
+  .modal-body {
+    padding: 18px 16px;
+    font-size: 13px;
+    color: var(--text-primary);
+    max-height: 56vh;
+    overflow-y: auto;
+  }
+  .modal-body p { margin-bottom: 10px; line-height: 1.5; }
+  .confirm-clientes {
+    margin: 10px 0;
+    padding: 10px 12px;
+    background: var(--bg-readonly);
+    border-radius: 6px;
+    max-height: 160px;
+    overflow-y: auto;
+    font-size: 12px;
+  }
+  .confirm-clientes li { margin: 2px 0; list-style: none; }
+  .confirm-clientes .mas { color: var(--text-muted); font-style: italic; margin-top: 4px; }
+
+  .res-resumen {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .res-pill {
+    flex: 1;
+    min-width: 90px;
+    text-align: center;
+    padding: 10px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+  }
+  .res-pill .num { font-family: var(--font-mono); font-size: 22px; font-weight: 700; line-height: 1; }
+  .res-pill .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); margin-top: 4px; }
+  .res-pill.ok { background: #f0fdf4; border-color: #bbf7d0; }
+  .res-pill.ok .num { color: #16a34a; }
+  .res-pill.fail { background: #fef2f2; border-color: #fecaca; }
+  .res-pill.fail .num { color: #dc2626; }
+  .res-pill.omit { background: #fefce8; border-color: #fde68a; }
+  .res-pill.omit .num { color: #b45309; }
+
+  .res-detalle h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin: 10px 0 6px;
+  }
+  .res-item {
+    padding: 8px 10px;
+    border-left: 3px solid #fca5a5;
+    background: #fff7f7;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .res-item.omit { border-left-color: #fcd34d; background: #fffbeb; }
+  .res-item .ri-cliente { font-weight: 600; color: var(--text-primary); }
+  .res-item .ri-contacto { color: var(--text-secondary); font-size: 11px; }
+  .res-item .ri-motivo { color: #b91c1c; margin-top: 3px; font-size: 11.5px; }
+  .res-item.omit .ri-motivo { color: #92400e; }
+  .res-todo-ok {
+    text-align: center;
+    padding: 16px;
+    color: #166534;
+    font-weight: 600;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-light);
+  }
+  .modal-actions button {
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border-light);
+    background: white;
+    color: var(--text-secondary);
+    transition: all var(--transition);
+  }
+  .modal-actions button.primary {
+    background: var(--varosa-blue);
+    border-color: var(--varosa-blue);
+    color: white;
+  }
+  .modal-actions button.primary:hover { opacity: 0.9; }
+  .modal-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .modal-actions .mini-spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 6px;
   }
 
   /* ===== TABLA ===== */
@@ -756,12 +864,24 @@
   </div>
 </div>
 
+<!-- Modal de confirmación / resultados de envío -->
+<div class="modal-overlay" id="modalEnvio">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span id="envioTitulo">Enviar preventa por WhatsApp</span>
+      <button type="button" id="btnCerrarEnvio" title="Cerrar">&#10005;</button>
+    </div>
+    <div class="modal-body" id="envioBody"></div>
+    <div class="modal-actions" id="envioActions"></div>
+  </div>
+</div>
+
 <script>
 // ============================================================
-// VAROSA — Centro de Operaciones Preventas (Widget V1.0)
-// Fase B1: visualización, filtros, columnas, selección.
-// Las acciones masivas (WhatsApp, EC, estados) se conectan
-// a webhooks de N8N en la Fase B2.
+// VAROSA — Centro de Operaciones Preventas (Widget V1.3)
+// Fase B2.2: envío real de preventa por WhatsApp conectado
+// al webhook WF_Widget_Envio_Preventa de N8N.
+// El botón "Enviar estado de cuenta" se conecta en la fase siguiente.
 // ============================================================
 
 // ===== CONFIGURACIÓN =====
@@ -769,10 +889,13 @@ const N8N_BASE = 'https://n8n-n8n.1efluw.easypanel.host';
 const ENDPOINTS = {
   datos: N8N_BASE + '/webhook/preventas-data',
   actualizar: N8N_BASE + '/webhook/preventas-update',
-  // Fase B2 (aún no existen — el widget los deshabilita solo):
-  whatsappMasivo: null,
+  whatsappMasivo: N8N_BASE + '/webhook/widget-envio-preventa',
+  // Fase siguiente (aún no existe — el widget lo deshabilita solo):
   enviarEC: null
 };
+
+// Tope de clientes por envío (el servidor también lo valida en 20)
+const MAX_POR_ENVIO = 20;
 
 // Catálogo de plantillas de WhatsApp (textos aprobados en Meta, copiados de Woztell)
 // IMPORTANTE: si una plantilla se edita en Meta/Woztell, actualizar aquí el texto
@@ -859,6 +982,7 @@ let esAdmin = false;
 let filtros = { ruta: '', backoffice: '', estado: '', cobro: '', buscar: '' };
 let orden = { campo: 'cliente', dir: 1 };
 let MODO_DEMO = false;
+let envioEnCurso = false;    // evita doble disparo del envío
 
 // ============================================================
 // HELPERS
@@ -1252,12 +1376,16 @@ function renderActionBar() {
 }
 
 // ============================================================
-// ACCIONES (Fase B2 — por ahora informan que están en camino)
+// ACCIONES
 // ============================================================
 function ejecutarAccion(accion) {
   const ids = [...seleccion];
   if (ids.length === 0) return;
 
+  if (accion === 'whatsapp') {
+    abrirConfirmacionPreventa(ids);
+    return;
+  }
   if (accion === 'contactado') {
     actualizarRegistros(ids, { Estado: 'CONTACTADO' }, ids.length + ' cliente(s) marcado(s) como contactado');
     return;
@@ -1272,8 +1400,168 @@ function ejecutarAccion(accion) {
     actualizarRegistros(ids, { Estado: nuevo }, ids.length + ' cliente(s) cambiado(s) a ' + cfg.label);
     return;
   }
-  const nombres = { whatsapp: 'Env\u00edo de preventa por WhatsApp', ec: 'Env\u00edo de estado de cuenta' };
-  mostrarStatus('\u2692\ufe0f ' + (nombres[accion] || accion) + ' (' + ids.length + ' clientes): esta acci\u00f3n se conecta en la Fase B2. Por ahora segu\u00ed us\u00e1ndola desde el reporte de Creator.', 'loading');
+  if (accion === 'ec') {
+    mostrarStatus('\u2692\ufe0f Env\u00edo de estado de cuenta: esta acci\u00f3n se conecta en la siguiente fase. Por ahora segu\u00ed us\u00e1ndola desde el reporte de Creator.', 'loading');
+    return;
+  }
+}
+
+// ============================================================
+// ENVÍO DE PREVENTA POR WHATSAPP (Fase B2.2)
+// Flujo: confirmar -> POST al webhook -> mostrar resultados ->
+// refrescar la tabla con los nuevos estados que devuelve el servidor.
+// ============================================================
+function abrirConfirmacionPreventa(ids) {
+  // Tope de seguridad: el servidor también lo valida en 20
+  if (ids.length > MAX_POR_ENVIO) {
+    mostrarStatus('Seleccionaste ' + ids.length + ' clientes. El m\u00e1ximo por env\u00edo es ' +
+      MAX_POR_ENVIO + '. Deseleccion\u00e1 algunos o envi\u00e1 en tandas.', 'error');
+    return;
+  }
+
+  // Lista de clientes a confirmar (tomados de los datos en memoria)
+  const seleccionados = registros.filter(r => ids.includes(r.id));
+  const titulo = document.getElementById('envioTitulo');
+  const body = document.getElementById('envioBody');
+  const actions = document.getElementById('envioActions');
+
+  titulo.textContent = 'Enviar preventa por WhatsApp';
+
+  let listaHtml = '<ul class="confirm-clientes">';
+  seleccionados.slice(0, 12).forEach(r => {
+    listaHtml += '<li>\u2022 ' + esc(r.cliente) + '</li>';
+  });
+  if (seleccionados.length > 12) {
+    listaHtml += '<li class="mas">\u2026 y ' + (seleccionados.length - 12) + ' m\u00e1s</li>';
+  }
+  listaHtml += '</ul>';
+
+  body.innerHTML =
+    '<p>Se enviar\u00e1 la preventa por WhatsApp a <b>' + seleccionados.length +
+    ' cliente(s)</b>, cada uno desde el canal de su asesora asignada.</p>' +
+    listaHtml +
+    '<p style="color:var(--text-secondary);font-size:12px;">Los mensajes salen de inmediato. Los clientes en estado "No contactado" pasar\u00e1n a "Contactado".</p>';
+
+  actions.innerHTML =
+    '<button type="button" id="btnEnvioCancelar">Cancelar</button>' +
+    '<button type="button" class="primary" id="btnEnvioConfirmar">Enviar a ' + seleccionados.length + '</button>';
+
+  document.getElementById('btnEnvioCancelar').addEventListener('click', cerrarEnvio);
+  document.getElementById('btnEnvioConfirmar').addEventListener('click', function () {
+    confirmarEnvioPreventa(ids);
+  });
+
+  document.getElementById('modalEnvio').classList.add('visible');
+}
+
+async function confirmarEnvioPreventa(ids) {
+  if (envioEnCurso) return;
+
+  if (MODO_DEMO) {
+    mostrarStatus('Modo demo: sin conexi\u00f3n con N8N, no se env\u00edan mensajes reales', 'error');
+    cerrarEnvio();
+    return;
+  }
+
+  envioEnCurso = true;
+  const actions = document.getElementById('envioActions');
+  const body = document.getElementById('envioBody');
+  // Deshabilitar acciones y mostrar spinner en el botón
+  actions.innerHTML = '<button type="button" class="primary" disabled>' +
+    '<span class="mini-spinner"></span>Enviando\u2026</button>';
+  body.innerHTML = '<p>Enviando preventas, por favor espere\u2026 No cierre esta ventana.</p>';
+
+  try {
+    const resp = await fetch(ENDPOINTS.whatsappMasivo, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ usuario: USUARIO_ACTUAL, ids: ids })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    mostrarResultadosEnvio(data);
+    aplicarCambiosEstadoLocal(data);
+  } catch (e) {
+    body.innerHTML = '<p style="color:#b91c1c;">No se pudo completar el env\u00edo: ' + esc(e.message) +
+      '</p><p style="color:var(--text-secondary);font-size:12px;">Los mensajes podr\u00edan no haberse enviado. ' +
+      'Revis\u00e1 la conexi\u00f3n e intent\u00e1 de nuevo, o us\u00e1 el reporte de Creator.</p>';
+    actions.innerHTML = '<button type="button" id="btnEnvioCerrar2" class="primary">Entendido</button>';
+    document.getElementById('btnEnvioCerrar2').addEventListener('click', cerrarEnvio);
+  } finally {
+    envioEnCurso = false;
+  }
+}
+
+// Pinta el resumen + detalle de fallidos/omitidos en el mismo modal
+function mostrarResultadosEnvio(data) {
+  const resumen = data.resumen || { enviados: 0, fallidos: 0, omitidos: 0 };
+  const resultados = data.resultados || [];
+  const omitidos = data.omitidos || [];
+  const titulo = document.getElementById('envioTitulo');
+  const body = document.getElementById('envioBody');
+  const actions = document.getElementById('envioActions');
+
+  titulo.textContent = 'Resultado del env\u00edo';
+
+  let html = '<div class="res-resumen">' +
+    '<div class="res-pill ok"><div class="num">' + resumen.enviados + '</div><div class="lbl">Enviados</div></div>' +
+    '<div class="res-pill fail"><div class="num">' + resumen.fallidos + '</div><div class="lbl">Fallidos</div></div>' +
+    '<div class="res-pill omit"><div class="num">' + resumen.omitidos + '</div><div class="lbl">Omitidos</div></div>' +
+    '</div>';
+
+  const fallidos = resultados.filter(r => !r.ok);
+
+  if (fallidos.length === 0 && omitidos.length === 0) {
+    html += '<div class="res-todo-ok">\u2713 Todos los mensajes se enviaron correctamente.</div>';
+  } else {
+    html += '<div class="res-detalle">';
+    if (fallidos.length > 0) {
+      html += '<h4>No se enviaron (' + fallidos.length + ')</h4>';
+      fallidos.forEach(r => {
+        html += '<div class="res-item">' +
+          '<div class="ri-cliente">' + esc(r.cliente) + '</div>' +
+          '<div class="ri-contacto">' + esc(r.contacto || '') + (r.numero ? ' \u00b7 ' + esc(r.numero) : '') + '</div>' +
+          '<div class="ri-motivo">' + esc(r.motivo || 'Error desconocido') + '</div>' +
+          '</div>';
+      });
+    }
+    if (omitidos.length > 0) {
+      html += '<h4>Omitidos (' + omitidos.length + ')</h4>';
+      omitidos.forEach(o => {
+        html += '<div class="res-item omit">' +
+          '<div class="ri-cliente">' + esc(o.cliente) + '</div>' +
+          '<div class="ri-motivo">' + esc(o.motivo || '') + '</div>' +
+          '</div>';
+      });
+    }
+    html += '<p style="color:var(--text-secondary);font-size:11.5px;margin-top:10px;">' +
+      'Estos clientes NO recibieron la preventa. Corregilos y reintent\u00e1, o contactalos manualmente. ' +
+      'Se envi\u00f3 un correo con el detalle.</p>';
+    html += '</div>';
+  }
+
+  body.innerHTML = html;
+  actions.innerHTML = '<button type="button" id="btnEnvioCerrar3" class="primary">Cerrar</button>';
+  document.getElementById('btnEnvioCerrar3').addEventListener('click', cerrarEnvio);
+}
+
+// Refleja en la tabla los estados que cambiaron a CONTACTADO (los que confirmó el servidor)
+function aplicarCambiosEstadoLocal(data) {
+  const idsContactado = data.idsParaContactado || [];
+  if (idsContactado.length > 0) {
+    registros.forEach(r => {
+      if (idsContactado.includes(r.id) && r.estado === 'NO_CONTACTADO') {
+        r.estado = 'CONTACTADO';
+      }
+    });
+    construirFiltrosDinamicos();
+    renderTodo();
+  }
+}
+
+function cerrarEnvio() {
+  if (envioEnCurso) return; // no cerrar a mitad de un envío
+  document.getElementById('modalEnvio').classList.remove('visible');
 }
 
 // ============================================================
@@ -1489,8 +1777,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('modalPreview').addEventListener('click', function (ev) {
     if (ev.target === this) cerrarPreview();
   });
+
+  // Modal de envío
+  document.getElementById('btnCerrarEnvio').addEventListener('click', cerrarEnvio);
+  document.getElementById('modalEnvio').addEventListener('click', function (ev) {
+    if (ev.target === this) cerrarEnvio();
+  });
+
   document.addEventListener('keydown', function (ev) {
-    if (ev.key === 'Escape') cerrarPreview();
+    if (ev.key === 'Escape') { cerrarPreview(); cerrarEnvio(); }
   });
 
   document.querySelectorAll('.action-bar button[data-accion]').forEach(btn => {
