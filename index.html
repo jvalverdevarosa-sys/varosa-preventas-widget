@@ -528,6 +528,20 @@
     color: #166534;
     font-weight: 600;
   }
+  /* Aviso de reenvío de estado de cuenta */
+  .reenvio-aviso {
+    margin: 12px 0;
+    padding: 10px 12px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-left: 3px solid #f59e0b;
+    border-radius: 0 6px 6px 0;
+    font-size: 12px;
+  }
+  .reenvio-titulo { font-weight: 700; color: #92400e; margin-bottom: 6px; }
+  .reenvio-aviso ul { list-style: none; margin: 4px 0; padding: 0; }
+  .reenvio-aviso li { color: #78350f; margin: 2px 0; }
+  .reenvio-nota { color: #92400e; margin-top: 6px; font-size: 11.5px; }
   .modal-actions {
     display: flex;
     gap: 8px;
@@ -890,12 +904,12 @@ const ENDPOINTS = {
   datos: N8N_BASE + '/webhook/preventas-data',
   actualizar: N8N_BASE + '/webhook/preventas-update',
   whatsappMasivo: N8N_BASE + '/webhook/widget-envio-preventa',
-  // Fase siguiente (aún no existe — el widget lo deshabilita solo):
-  enviarEC: null
+  enviarEC: N8N_BASE + '/webhook/widget-envio-ec'
 };
 
-// Tope de clientes por envío (el servidor también lo valida en 20)
-const MAX_POR_ENVIO = 20;
+// Tope de clientes por envío (el servidor también lo valida)
+const MAX_POR_ENVIO = 20;       // preventa
+const MAX_POR_ENVIO_EC = 10;    // estado de cuenta (más pesado: genera PDF por cliente)
 
 // Catálogo de plantillas de WhatsApp (textos aprobados en Meta, copiados de Woztell)
 // IMPORTANTE: si una plantilla se edita en Meta/Woztell, actualizar aquí el texto
@@ -1401,7 +1415,7 @@ function ejecutarAccion(accion) {
     return;
   }
   if (accion === 'ec') {
-    mostrarStatus('\u2692\ufe0f Env\u00edo de estado de cuenta: esta acci\u00f3n se conecta en la siguiente fase. Por ahora segu\u00ed us\u00e1ndola desde el reporte de Creator.', 'loading');
+    abrirConfirmacionEC(ids);
     return;
   }
 }
@@ -1562,6 +1576,118 @@ function aplicarCambiosEstadoLocal(data) {
 function cerrarEnvio() {
   if (envioEnCurso) return; // no cerrar a mitad de un envío
   document.getElementById('modalEnvio').classList.remove('visible');
+}
+
+// ============================================================
+// ENVÍO DE ESTADO DE CUENTA POR WHATSAPP (Fase B2.3)
+// Reutiliza el mismo modal (#modalEnvio). Diferencias vs preventa:
+//  - tope de 10 (genera un PDF por cliente, es más pesado)
+//  - avisa de reenvíos: clientes que ya están en EC_ENVIADO
+//  - al terminar, actualiza el badge de Cobro (no el de Estado)
+// ============================================================
+function abrirConfirmacionEC(ids) {
+  if (ids.length > MAX_POR_ENVIO_EC) {
+    mostrarStatus('Seleccionaste ' + ids.length + ' clientes. El m\u00e1ximo de estados de cuenta por env\u00edo es ' +
+      MAX_POR_ENVIO_EC + ' (cada uno genera un PDF). Deseleccion\u00e1 algunos o envi\u00e1 en tandas.', 'error');
+    return;
+  }
+
+  const seleccionados = registros.filter(r => ids.includes(r.id));
+  // Separar nuevos (PENDIENTE u otro) de reenvíos (ya en EC_ENVIADO)
+  const yaEnviados = seleccionados.filter(r => r.cobro === 'EC_ENVIADO' || r.cobro === 'EC_ENVIADO_EMAIL');
+  const nuevos = seleccionados.filter(r => !(r.cobro === 'EC_ENVIADO' || r.cobro === 'EC_ENVIADO_EMAIL'));
+
+  const titulo = document.getElementById('envioTitulo');
+  const body = document.getElementById('envioBody');
+  const actions = document.getElementById('envioActions');
+
+  titulo.textContent = 'Enviar estado de cuenta';
+
+  let html = '<p>Se enviar\u00e1 el estado de cuenta (PDF) por WhatsApp a <b>' + seleccionados.length +
+    ' cliente(s)</b>, cada uno desde el canal de su asesora asignada.</p>';
+
+  if (nuevos.length > 0) {
+    html += '<ul class="confirm-clientes">';
+    nuevos.slice(0, 10).forEach(r => { html += '<li>\u2022 ' + esc(r.cliente) + '</li>'; });
+    if (nuevos.length > 10) html += '<li class="mas">\u2026 y ' + (nuevos.length - 10) + ' m\u00e1s</li>';
+    html += '</ul>';
+  }
+
+  // Bloque de advertencia de reenvío
+  if (yaEnviados.length > 0) {
+    html += '<div class="reenvio-aviso">' +
+      '<div class="reenvio-titulo">\u26a0\ufe0f Reenv\u00edo: ' + yaEnviados.length + ' cliente(s) ya recibieron un estado de cuenta</div>' +
+      '<ul>';
+    yaEnviados.slice(0, 8).forEach(r => { html += '<li>\u2022 ' + esc(r.cliente) + '</li>'; });
+    if (yaEnviados.length > 8) html += '<li>\u2026 y ' + (yaEnviados.length - 8) + ' m\u00e1s</li>';
+    html += '</ul>' +
+      '<div class="reenvio-nota">Si continu\u00e1s, se les enviar\u00e1 de nuevo. \u00danicamente hacelo si hubo un cambio (por ejemplo, un pago) desde el \u00faltimo env\u00edo.</div>' +
+      '</div>';
+  }
+
+  html += '<p style="color:var(--text-secondary);font-size:12px;">Los mensajes salen de inmediato. El estado de cobro pasar\u00e1 a "EC enviado". Puede tardar unos segundos por cliente.</p>';
+
+  body.innerHTML = html;
+  actions.innerHTML =
+    '<button type="button" id="btnEnvioCancelar">Cancelar</button>' +
+    '<button type="button" class="primary" id="btnEnvioConfirmar">Enviar a ' + seleccionados.length + '</button>';
+
+  document.getElementById('btnEnvioCancelar').addEventListener('click', cerrarEnvio);
+  document.getElementById('btnEnvioConfirmar').addEventListener('click', function () {
+    confirmarEnvioEC(ids);
+  });
+
+  document.getElementById('modalEnvio').classList.add('visible');
+}
+
+async function confirmarEnvioEC(ids) {
+  if (envioEnCurso) return;
+
+  if (MODO_DEMO) {
+    mostrarStatus('Modo demo: sin conexi\u00f3n con N8N, no se env\u00edan estados de cuenta reales', 'error');
+    cerrarEnvio();
+    return;
+  }
+
+  envioEnCurso = true;
+  const actions = document.getElementById('envioActions');
+  const body = document.getElementById('envioBody');
+  actions.innerHTML = '<button type="button" class="primary" disabled>' +
+    '<span class="mini-spinner"></span>Enviando\u2026</button>';
+  body.innerHTML = '<p>Generando y enviando los estados de cuenta, por favor espere\u2026 ' +
+    'Cada cliente genera un PDF, as\u00ed que puede tardar unos segundos. No cierre esta ventana.</p>';
+
+  try {
+    const resp = await fetch(ENDPOINTS.enviarEC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ usuario: USUARIO_ACTUAL, ids: ids })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    mostrarResultadosEnvio(data);
+    aplicarCambiosCobroLocal(data);
+  } catch (e) {
+    body.innerHTML = '<p style="color:#b91c1c;">No se pudo completar el env\u00edo: ' + esc(e.message) +
+      '</p><p style="color:var(--text-secondary);font-size:12px;">Los estados de cuenta podr\u00edan no haberse enviado. ' +
+      'Revis\u00e1 la conexi\u00f3n e intent\u00e1 de nuevo, o us\u00e1 el reporte de Creator.</p>';
+    actions.innerHTML = '<button type="button" id="btnEnvioCerrar2" class="primary">Entendido</button>';
+    document.getElementById('btnEnvioCerrar2').addEventListener('click', cerrarEnvio);
+  } finally {
+    envioEnCurso = false;
+  }
+}
+
+// Refleja en la tabla los clientes cuyo Estado_Cobro pasó a EC_ENVIADO
+function aplicarCambiosCobroLocal(data) {
+  const ids = data.idsParaEnviado || [];
+  if (ids.length > 0) {
+    registros.forEach(r => {
+      if (ids.includes(r.id)) r.cobro = 'EC_ENVIADO';
+    });
+    construirFiltrosDinamicos();
+    renderTodo();
+  }
 }
 
 // ============================================================
