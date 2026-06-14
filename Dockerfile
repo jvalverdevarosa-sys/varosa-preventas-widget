@@ -1,10 +1,10 @@
 # Dockerfile — VAROSA Centro de Operaciones Preventas (Widget)
-# Sirve los widgets HTML estáticos (index.html, dashboard_preventas.html) con nginx alpine.
-# Mismo patrón que varosa-oc-widget.
+# Sirve los HTML estáticos con nginx alpine y desactiva el cache del navegador
+# para que cada deploy aparezca de inmediato (incluido el iframe de Creator).
 # Build: 2026-06-14
 FROM nginx:alpine
-# Copiar TODOS los HTML del repo al directorio que publica nginx
+# Copiar todos los HTML del repo
 COPY *.html /usr/share/nginx/html/
-# Puerto por defecto de nginx
+# Config de nginx con no-cache (reemplaza la default)
+COPY default.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
-# nginx arranca automáticamente con el CMD default de la imagen base
