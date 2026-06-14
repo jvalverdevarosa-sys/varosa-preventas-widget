@@ -773,6 +773,8 @@
     <div class="header-actions">
       <span class="header-user" id="lblUsuario"></span>
       <span class="header-user" id="lblActualizado"></span>
+      <button id="btnDashboard" type="button" title="Abrir el dashboard de preventas">&#128202; Dashboard</button>
+      <button id="btnPantallaCompleta" type="button" title="Abrir a pantalla completa" style="display:none;">&#8599; Pantalla completa</button>
       <button id="btnRefrescar" type="button">&#8635; Actualizar</button>
     </div>
   </div>
@@ -1984,6 +1986,26 @@ document.addEventListener('DOMContentLoaded', () => {
   cargarCols();
 
   document.getElementById('btnRefrescar').addEventListener('click', cargarDatos);
+  // === Botón "Dashboard": abre el dashboard de preventas en pestaña nueva, con el usuario actual ===
+  document.getElementById('btnDashboard').addEventListener('click', function () {
+    const url = new URL('dashboard_preventas.html', window.location.href);
+    if (USUARIO_ACTUAL) url.searchParams.set('usuario', USUARIO_ACTUAL);
+    window.open(url.href, '_blank', 'noopener');
+  });
+
+  // === Botón "Pantalla completa": solo aparece cuando el widget está embebido en Creator (dentro de un iframe).
+  //     Abre este mismo widget en pestaña nueva a pantalla completa, esquivando el límite de tamaño de Creator. ===
+  (function () {
+    const btnFull = document.getElementById('btnPantallaCompleta');
+    let embebido = false;
+    try { embebido = (window.self !== window.top); } catch (e) { embebido = true; }
+    if (embebido) {
+      btnFull.style.display = '';
+      btnFull.addEventListener('click', function () {
+        window.open(window.location.href, '_blank', 'noopener');
+      });
+    }
+  })();
   document.getElementById('btnCerrarStatus').addEventListener('click', () => {
     document.getElementById('statusBar').classList.remove('visible');
   });
