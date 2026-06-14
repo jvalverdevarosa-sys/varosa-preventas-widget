@@ -229,8 +229,8 @@ const ESTADOS_PEDIDO = ['PIDIO', 'CONFIRMADO'];
 const ESTADO_BLOQUEADO = 'BLOQUEADO POR CXC'; // fuera del cálculo de tasas
 
 // ---- Metas / umbrales de color (AJUSTABLES: cambiá estos números a tus metas reales) ----
-const META_COBERTURA = { verde: 90, ambar: 70 };   // contactar a casi todos
-const META_CONVERSION = { verde: 50, ambar: 25 };  // de los contactados, cuántos piden
+const META_COBERTURA = { verde: 80, ambar: 50 };   // verde >=80 bueno, ambar 50-79 regular, rojo <50 malo
+const META_CONVERSION = { verde: 80, ambar: 50 };  // misma escala (ajustable si quieres otra para conversion)
 
 const ESTADOS_CFG = {
   'NO_CONTACTADO':     { label: 'No contactado', color: '#e74c3c' },
