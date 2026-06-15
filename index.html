@@ -367,6 +367,33 @@
     vertical-align: middle;
   }
   .prev-btn:hover { color: var(--varosa-blue); }
+  .cartera-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 13px; margin-left: 6px; padding: 0 2px;
+    vertical-align: middle; opacity: 0.7;
+  }
+  .cartera-btn:hover { opacity: 1; }
+
+  /* Tramos de CxC */
+  .cxc-tramos { display: flex; gap: 8px; margin: 4px 0 14px; flex-wrap: wrap; }
+  .cxc-pill { flex: 1; min-width: 110px; text-align: center; padding: 10px 8px; border-radius: 8px; border: 1px solid var(--border-light); }
+  .cxc-pill .cxc-monto { font-family: var(--font-mono); font-size: 15px; font-weight: 700; line-height: 1.1; }
+  .cxc-pill .cxc-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); margin-top: 4px; }
+  .cxc-pill.t-porvencer { background: #eff6ff; border-color: #bfdbfe; }
+  .cxc-pill.t-porvencer .cxc-monto { color: #1d4ed8; }
+  .cxc-pill.t-0-30 { background: #fffbeb; border-color: #fde68a; }
+  .cxc-pill.t-0-30 .cxc-monto { color: #b45309; }
+  .cxc-pill.t-31-60 { background: #fff7ed; border-color: #fed7aa; }
+  .cxc-pill.t-31-60 .cxc-monto { color: #c2410c; }
+  .cxc-pill.t-60 { background: #fef2f2; border-color: #fecaca; }
+  .cxc-pill.t-60 .cxc-monto { color: #dc2626; }
+  .cxc-total { text-align: center; font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
+  .cxc-total strong { font-family: var(--font-mono); color: var(--text-primary); }
+  .cxc-tabla { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  .cxc-tabla th { text-align: left; color: var(--text-secondary); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--border-light); text-transform: uppercase; font-size: 10px; letter-spacing: 0.03em; }
+  .cxc-tabla td { padding: 4px 6px; border-bottom: 1px solid var(--bg-readonly); font-family: var(--font-mono); }
+  .cxc-tabla td.t-txt { font-family: var(--font-body); }
+  .cxc-tabla .num-r { text-align: right; }
 
   /* ===== MODAL (vista previa + confirmación + resultados) ===== */
   .modal-overlay {
@@ -892,8 +919,20 @@
     <div class="modal-actions" id="envioActions"></div>
   </div>
 </div>
-
+<!-- Modal de antigüedad de cartera (CxC) -->
+<div class="modal-overlay" id="modalCartera">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span id="cxcTitulo">Antig&uuml;edad de cartera</span>
+      <button type="button" id="btnCerrarCartera" title="Cerrar">&#10005;</button>
+    </div>
+    <div class="modal-body" id="cxcBody"></div>
+    <div class="modal-foot">Datos en vivo desde Books al momento de la consulta. Puede diferir del "Monto vencido" de la tabla (que es una foto previa).</div>
+  </div>
+</div>
+  
 <script>
+  
 // ============================================================
 // VAROSA — Centro de Operaciones Preventas (Widget V1.3)
 // Fase B2.2: envío real de preventa por WhatsApp conectado
@@ -908,7 +947,8 @@ const ENDPOINTS = {
   actualizar: N8N_BASE + '/webhook/preventas-update',
   whatsappMasivo: N8N_BASE + '/webhook/widget-envio-preventa',
   enviarEC: N8N_BASE + '/webhook/widget-envio-ec',
-  enviarECEmail: N8N_BASE + '/webhook/widget-envio-ec-email'
+  enviarECEmail: N8N_BASE + '/webhook/widget-envio-ec-email',
+  cxcTramos: N8N_BASE + '/webhook/widget-cxc-tramos'
 };
 
 // Tope de clientes por envío (el servidor también lo valida)
@@ -1279,7 +1319,8 @@ function celda(c, r) {
     }
     case 'vencido': {
       const cls = r.montoVencido > 0 ? 'vencido-pos' : 'vencido-cero';
-      return '<td class="cell-right"><span class="' + cls + '">' + fmtMoney(r.montoVencido) + '</span></td>';
+      const btn = r.booksId ? '<button class="cartera-btn" data-cartera="' + esc(r.id) + '" title="Ver antig\u00fcedad de cartera (CxC) en vivo desde Books">&#128188;</button>' : '';
+      return '<td class="cell-right"><span class="' + cls + '">' + fmtMoney(r.montoVencido) + '</span>' + btn + '</td>';
     }
     case 'dias': return '<td class="cell-right">' + (r.dias > 0 ? r.dias : '\u2014') + '</td>';
     case 'ultimo': {
@@ -1349,6 +1390,9 @@ function renderFilas() {
 
     tbody.querySelectorAll('button[data-preview]').forEach(btn => {
       btn.addEventListener('click', function () { verPreview(this.dataset.preview); });
+    });
+    tbody.querySelectorAll('button[data-cartera]').forEach(btn => {
+      btn.addEventListener('click', function () { verCartera(this.dataset.cartera); });
     });
   }
 
@@ -1915,6 +1959,88 @@ function cerrarPreview() {
   document.getElementById('modalPreview').classList.remove('visible');
 }
 
+function cerrarCartera() {
+  document.getElementById('modalCartera').classList.remove('visible');
+}
+
+async function verCartera(id) {
+  const r = registros.find(x => x.id === id);
+  if (!r) return;
+  const titulo = document.getElementById('cxcTitulo');
+  const body = document.getElementById('cxcBody');
+  titulo.textContent = 'Cartera: ' + (r.cliente || '');
+  document.getElementById('modalCartera').classList.add('visible');
+
+  if (MODO_DEMO) {
+    body.innerHTML = '<p style="color:var(--text-secondary);">Modo demo: sin conexi\u00f3n con N8N, no se consulta Books.</p>';
+    return;
+  }
+  if (!r.booksId) {
+    body.innerHTML = '<p style="color:var(--text-secondary);">Este cliente no tiene Books_Customer_ID; no se puede consultar su cartera.</p>';
+    return;
+  }
+
+  body.innerHTML = '<div style="text-align:center;padding:24px;"><div class="spinner" style="margin:0 auto;"></div><p style="margin-top:10px;color:var(--text-secondary);">Consultando Books\u2026</p></div>';
+
+  try {
+    const url = ENDPOINTS.cxcTramos + '?books_id=' + encodeURIComponent(r.booksId) +
+      '&usuario=' + encodeURIComponent(USUARIO_ACTUAL) +
+      '&cliente=' + encodeURIComponent(r.cliente || '');
+    const resp = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data.ok) {
+      body.innerHTML = '<p style="color:#b91c1c;">' + esc(data.motivo || 'No se pudo obtener la cartera.') + '</p>';
+      return;
+    }
+    body.innerHTML = renderCartera(data);
+  } catch (e) {
+    body.innerHTML = '<p style="color:#b91c1c;">No se pudo consultar la cartera: ' + esc(e.message) + '</p>' +
+      '<p style="color:var(--text-secondary);font-size:12px;">Revis\u00e1 la conexi\u00f3n e intent\u00e1 de nuevo.</p>';
+  }
+}
+
+function renderCartera(d) {
+  const pill = (cls, monto, lbl) =>
+    '<div class="cxc-pill ' + cls + '"><div class="cxc-monto">' + fmtMoney(monto) + '</div><div class="cxc-lbl">' + lbl + '</div></div>';
+
+  let html = '<div class="cxc-tramos">' +
+    pill('t-porvencer', d.por_vencer, 'Por vencer') +
+    pill('t-0-30', d.t_0_30, '0\u201330 d\u00edas') +
+    pill('t-31-60', d.t_31_60, '31\u201360 d\u00edas') +
+    pill('t-60', d.t_60_mas, '60+ d\u00edas') +
+    '</div>';
+
+  html += '<div class="cxc-total">Total pendiente: <strong>' + fmtMoney(d.total) +
+    '</strong> &middot; Vencido: <strong>' + fmtMoney(d.vencido) + '</strong> &middot; ' +
+    d.cantidad + ' factura(s)</div>';
+
+  if (d._hayMas) {
+    html += '<p style="color:#b45309;font-size:11.5px;margin-bottom:8px;">\u26a0\ufe0f Este cliente tiene m\u00e1s facturas de las mostradas; el total podr\u00eda estar incompleto.</p>';
+  }
+  if (d._sospechosas > 0) {
+    html += '<p style="color:#b45309;font-size:11.5px;margin-bottom:8px;">\u26a0\ufe0f ' + d._sospechosas + ' factura(s) en otra moneda sin tipo de cambio v\u00e1lido: no se convirtieron.</p>';
+  }
+
+  if (!d.facturas || d.facturas.length === 0) {
+    html += '<p style="text-align:center;color:var(--text-secondary);padding:10px;">Sin facturas pendientes. \u00a1Al d\u00eda!</p>';
+    return html;
+  }
+
+  html += '<table class="cxc-tabla"><thead><tr><th>Factura</th><th>Vence</th><th class="num-r">D\u00edas</th><th class="num-r">Saldo</th></tr></thead><tbody>';
+  d.facturas.forEach(f => {
+    const ref = f.referencia ? ' <span style="color:var(--text-muted);">(' + esc(f.referencia) + ')</span>' : '';
+    const numCorto = (f.numero || '').slice(-6);
+    html += '<tr>' +
+      '<td class="t-txt">' + esc(numCorto) + ref + '</td>' +
+      '<td>' + esc(f.vence) + '</td>' +
+      '<td class="num-r">' + (f.dias > 0 ? f.dias : '\u2014') + '</td>' +
+      '<td class="num-r">' + fmtMoney(f.saldo_crc) + (f.moneda !== 'CRC' ? ' <span style="color:var(--text-muted);">(' + esc(f.moneda) + ')</span>' : '') + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}  
 
 function editarNotas(id) {
   const td = document.querySelector('td[data-notas-id="' + id + '"]');
@@ -2041,6 +2167,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('modalPreview').addEventListener('click', function (ev) {
     if (ev.target === this) cerrarPreview();
   });
+  document.getElementById('btnCerrarCartera').addEventListener('click', cerrarCartera);
+  document.getElementById('modalCartera').addEventListener('click', function (ev) {
+    if (ev.target === this) cerrarCartera();
+  });
 
   // Modal de envío
   document.getElementById('btnCerrarEnvio').addEventListener('click', cerrarEnvio);
@@ -2049,7 +2179,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.addEventListener('keydown', function (ev) {
-    if (ev.key === 'Escape') { cerrarPreview(); cerrarEnvio(); }
+    if (ev.key === 'Escape') { cerrarPreview(); cerrarEnvio(); cerrarCartera(); }
   });
 
   document.querySelectorAll('.action-bar button[data-accion]').forEach(btn => {
