@@ -869,6 +869,10 @@
         <option value="">Cambiar estado a...</option>
       </select>
       <button type="button" class="btn-sec" data-accion="estadoMasivo">Aplicar</button>
+      <select id="selPlantillaMasiva" class="sel-estado-masivo">
+        <option value="">Cambiar plantilla a...</option>
+      </select>
+      <button type="button" class="btn-sec" data-accion="plantillaMasiva">Aplicar</button>
       <button type="button" class="btn-limpiar" id="btnLimpiarSel">Limpiar selecci&#243;n</button>
     </div>
 
@@ -1460,6 +1464,15 @@ function ejecutarAccion(accion) {
     }
     const cfg = ESTADOS_CFG[nuevo] || { label: nuevo };
     actualizarRegistros(ids, { Estado: nuevo }, ids.length + ' cliente(s) cambiado(s) a ' + cfg.label);
+    return;
+  }
+  if (accion === 'plantillaMasiva') {
+    const nueva = document.getElementById('selPlantillaMasiva').value;
+    if (!nueva) {
+      mostrarStatus('Primero eleg\u00ed la plantilla en el desplegable "Cambiar plantilla a..."', 'error');
+      return;
+    }
+    actualizarRegistros(ids, { Plantilla_WhatsApp: nueva }, ids.length + ' cliente(s) con plantilla ' + nueva);
     return;
   }
   if (accion === 'ec') {
@@ -2161,6 +2174,13 @@ document.addEventListener('DOMContentLoaded', () => {
     opt.value = e;
     opt.textContent = cfg.label;
     selMasivo.appendChild(opt);
+  });
+  const selPlantilla = document.getElementById('selPlantillaMasiva');
+  PLANTILLAS.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = p;
+    selPlantilla.appendChild(opt);
   });
 
   document.getElementById('btnCerrarPreview').addEventListener('click', cerrarPreview);
