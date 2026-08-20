@@ -293,7 +293,8 @@ async function cargar() {
     return;
   }
   try {
-    const resp = await fetch(ENDPOINT_DATOS + '?usuario=' + encodeURIComponent(USUARIO_ACTUAL), { headers: { 'Accept': 'application/json' } });
+    const resp = await fetch(ENDPOINT_DATOS + '?usuario=' + encodeURIComponent(USUARIO_ACTUAL),
+  { headers: { 'X-Varosa-Token': VAROSA_TOKEN, 'Accept': 'application/json' } });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'respuesta sin success');
