@@ -946,6 +946,7 @@
 
 // ===== CONFIGURACIÓN =====
 const N8N_BASE = 'https://n8n.varosacr.com';
+const VAROSA_TOKEN = '560debc7437659283e1778cc976c31826d3dc353cfcb6e6920c8996d7203ee7c';
 const ENDPOINTS = {
   datos: N8N_BASE + '/webhook/preventas-data',
   actualizar: N8N_BASE + '/webhook/preventas-update',
@@ -1102,9 +1103,9 @@ async function cargarDatos() {
 
   try {
     const resp = await fetch(ENDPOINTS.datos + '?usuario=' + encodeURIComponent(USUARIO_ACTUAL), {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' }
-    });
+    method: 'GET',
+    headers: { 'X-Varosa-Token': VAROSA_TOKEN, 'Accept': 'application/json' }
+  });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     mostrarLoading(false);
@@ -1553,7 +1554,7 @@ async function confirmarEnvioPreventa(ids) {
   try {
     const resp = await fetch(ENDPOINTS.whatsappMasivo, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      headers: { 'X-Varosa-Token': VAROSA_TOKEN, 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ usuario: USUARIO_ACTUAL, ids: ids })
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -1725,7 +1726,7 @@ async function confirmarEnvioEC(ids) {
   try {
     const resp = await fetch(ENDPOINTS.enviarEC, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      headers: { 'X-Varosa-Token': VAROSA_TOKEN, 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ usuario: USUARIO_ACTUAL, ids: ids })
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -1847,7 +1848,7 @@ async function confirmarEnvioECCorreo(ids) {
   try {
     const resp = await fetch(ENDPOINTS.enviarECEmail, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      headers: { 'X-Varosa-Token': VAROSA_TOKEN, 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ usuario: USUARIO_ACTUAL, ids: ids })
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -1879,7 +1880,7 @@ async function actualizarRegistros(ids, campos, mensajeExito) {
   try {
     const resp = await fetch(ENDPOINTS.actualizar, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      headers: { 'X-Varosa-Token': VAROSA_TOKEN, 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ usuario: USUARIO_ACTUAL, ids: ids, campos: campos })
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -1999,7 +2000,10 @@ async function verCartera(id) {
     const url = ENDPOINTS.cxcTramos + '?books_id=' + encodeURIComponent(r.booksId) +
       '&usuario=' + encodeURIComponent(USUARIO_ACTUAL) +
       '&cliente=' + encodeURIComponent(r.cliente || '');
-    const resp = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: { 'X-Varosa-Token': VAROSA_TOKEN, 'Accept': 'application/json' }
+    });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     if (!data.ok) {
